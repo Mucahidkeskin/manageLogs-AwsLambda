@@ -1,6 +1,8 @@
 import json
 import boto3
 from botocore.client import Config
+import dateutil.tz
+
 def lambda_handler(event, context):
 
     s3 = boto3.resource('s3')
@@ -14,25 +16,32 @@ def lambda_handler(event, context):
         print(event["queryStringParameters"]["name"])
         for object_summary in my_bucket.objects.filter(Prefix = (event["queryStringParameters"]["name"])):
             count+=1
-            print(object_summary)
             response = s3_client.generate_presigned_url('get_object',
                                                     Params={'Bucket': "logbucket71500-staging",
                                                             'Key': object_summary.key},
                                                     ExpiresIn=3600)
-            print(response)
             name = object_summary.key
             name = name[(name.rfind("/")+1):]
+            date = object_summary.last_modified
+            dtimestamp = round(date.timestamp())
             x = {
                 "fileName":name,
-                "url":response
+                "url":response,
+                "date":dtimestamp
             }
             if(".json" in x["fileName"]):
+                x["fileName"] = x["fileName"].replace(".json","")
                 fileList.append(x)
         return fileList
     elif (ev ==  "/getUploadLink"):
+        fileName =event["queryStringParameters"]["fileName"]
+        userName =event["queryStringParameters"]["name"]
+        if((".zip" not in fileName) and (".libatlog" not in fileName)):
+            return {status:"400"}
+        
         uploadURL=s3_client.generate_presigned_url('put_object',
                                                     Params={'Bucket': "logbucket71500-staging",
-                                                            'Key': event["queryStringParameters"]["name"]},
+                                                            'Key': userName+"/"+fileName},
                                                     ExpiresIn=2500)
         return uploadURL
     elif (ev ==  "/deleteLog"):
